@@ -3,8 +3,8 @@ import cv2
 import face_recognition as fr
 
 # cargar imagenes
-foto_control = fr.load_image_file('FotoA.jpg')
-foto_prueba = fr.load_image_file('FotoB.jpg')
+foto_control = fr.load_image_file('Proyectos/Dia 14/FotoA.jpg')
+foto_prueba = fr.load_image_file('Proyectos/Dia 14/FotoB.jpg')
 
 # pasar imagenes a rgb
 foto_control = cv2.cvtColor(foto_control, cv2.COLOR_BGR2RGB)
