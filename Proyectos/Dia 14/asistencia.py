@@ -2,24 +2,30 @@ import cv2
 import face_recognition as fr
 import os
 import numpy
-from datetime import datetime, timedelta
+from datetime import datetime
 
-# 📌 Ruta de empleados
-ruta = 'Proyectos/Dia 14/Empleados'
-mis_imagenes = []
+# 📌 Ruta del dataset
+ruta = "Proyectos/Dia 14/Empleados"
 nombres_empleados = []
-lista_empleados = os.listdir(ruta)
+lista_empleados_codificada = []
 
-# Cargar imágenes
-for nombre in lista_empleados:
-    imagen_actual = cv2.imread(f'{ruta}/{nombre}')
-    if imagen_actual is not None:
-        mis_imagenes.append(imagen_actual)
-        nombres_empleados.append(os.path.splitext(nombre)[0])
+# Codificar todas las imágenes del dataset
 
-print("Empleados cargados:", nombres_empleados)
 
-# 📌 Codificar imágenes
+def cargar_dataset(ruta):
+    imagenes = []
+    nombres = []
+
+    for carpeta in os.listdir(ruta):
+        ruta_empleado = os.path.join(ruta, carpeta)
+        if os.path.isdir(ruta_empleado):
+            for archivo in os.listdir(ruta_empleado):
+                path = os.path.join(ruta_empleado, archivo)
+                imagen = cv2.imread(path)
+                if imagen is not None:
+                    imagenes.append(imagen)
+                    nombres.append(carpeta)
+    return imagenes, nombres
 
 
 def codificar(imagenes):
@@ -30,8 +36,6 @@ def codificar(imagenes):
         if len(codigos) > 0:
             lista_codificada.append(codigos[0])
     return lista_codificada
-
-# 📌 Registrar ingresos únicos (una vez por día)
 
 
 def registrar_ingresos(persona):
@@ -44,7 +48,6 @@ def registrar_ingresos(persona):
         registros = [linea.strip().split(',')
                      for linea in lista_datos if linea.strip()]
 
-        # Verificar si ya se registró hoy
         ya_registrado = any(p[0] == persona and p[1] ==
                             fecha for p in registros)
 
@@ -53,7 +56,6 @@ def registrar_ingresos(persona):
             print(f"✅ Registro guardado: {persona} - {fecha} {hora}")
 
 
-# 📌 Guardar en log completo (rate-limited)
 ultimo_log = {}
 
 
@@ -62,7 +64,6 @@ def registrar_log(persona):
     fecha = ahora.strftime('%d/%m/%Y')
     hora = ahora.strftime('%H:%M:%S')
 
-    # Control para no spamear: 5 seg por persona
     if persona in ultimo_log:
         diferencia = (ahora - ultimo_log[persona]).total_seconds()
         if diferencia < 5:
@@ -75,15 +76,16 @@ def registrar_log(persona):
     ultimo_log[persona] = ahora
 
 
-# 📌 Codificar empleados
-lista_empleados_codificada = codificar(mis_imagenes)
+# 📌 Cargar y codificar dataset
+imagenes, nombres_empleados = cargar_dataset(ruta)
+lista_empleados_codificada = codificar(imagenes)
+print("Empleados cargados:", set(nombres_empleados))
 
-# 📌 Captura desde celular (DroidCam o similar)
-captura = cv2.VideoCapture("http://192.168.1.52:4747/video")
-# 📌 Para PC usar:
+# 📌 Captura de cámara
 # captura = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+captura = cv2.VideoCapture("http://192.168.1.52:4747/video")
 
-print("Iniciando reconocimiento facial... (presiona Q para salir)")
+print("🎥 Iniciando reconocimiento facial... (presiona Q para salir)")
 
 while True:
     exito, imagen = captura.read()
@@ -91,25 +93,22 @@ while True:
         print("No se ha podido tomar la captura")
         break
 
-    # Reconocer cara en captura
     cara_captura = fr.face_locations(imagen)
     cara_captura_codificada = fr.face_encodings(imagen, cara_captura)
 
-    # Buscar coincidencias
     for caracodif, caraubic in zip(cara_captura_codificada, cara_captura):
         distancias = fr.face_distance(lista_empleados_codificada, caracodif)
         nombre = "Desconocido"
 
         if len(distancias) > 0:
             indice_coincidencia = numpy.argmin(distancias)
-            if distancias[indice_coincidencia] <= 0.6:
+            # umbral más tolerante gracias al dataset
+            if distancias[indice_coincidencia] <= 0.5:
                 nombre = nombres_empleados[indice_coincidencia]
 
-        # Guardar en registro y log
         registrar_ingresos(nombre)
         registrar_log(nombre)
 
-        # Dibujar rectángulo y nombre
         y1, x2, y2, x1 = caraubic
         color = (0, 255, 0) if nombre != "Desconocido" else (0, 0, 255)
         cv2.rectangle(imagen, (x1, y1), (x2, y2), color, 2)
@@ -117,13 +116,10 @@ while True:
         cv2.putText(imagen, nombre, (x1 + 6, y2 - 6),
                     cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
 
-    # Mostrar imagen obtenida
     cv2.imshow('Reconocimiento Facial', imagen)
 
-    # Salir con Q
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# 📌 Liberar recursos
 captura.release()
 cv2.destroyAllWindows()

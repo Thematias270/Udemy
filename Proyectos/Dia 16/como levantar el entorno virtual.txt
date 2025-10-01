@@ -1,0 +1,2 @@
+ejecutar esta linea
+source "C:/Users/spide/OneDrive/Documentos/Udemy/Proyectos/Dia 16/enterno_prueba/.venv/Scripts/activate"
